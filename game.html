@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>okJLUV Crashout Simulator</title>
+    <style>
+        /* Basic styles for the page */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden; /* Hide scrollbars */
+        }
+        /* Container for the game canvas and title */
+        .game-container {
+            position: relative; /* Needed for positioning the overlay */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-radius: 12px;
+            background-color: #2d3748;
+            padding: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        /* Styling for the game canvas */
+        canvas {
+            background-color: #87ceeb; /* Sky blue background */
+            border: 4px solid #4a5568;
+            border-radius: 8px;
+            display: block; /* Removes extra space below canvas */
+            max-width: 100%;
+        }
+        /* Fireworks canvas style */
+        #fireworksCanvas {
+            position: absolute;
+            top: 16px; /* Match parent padding */
+            left: 16px; /* Match parent padding */
+            pointer-events: none; /* Allows clicks to go through to elements behind it */
+            z-index: 2;
+            background-color: transparent;
+            border: none;
+        }
+        /* Overlay for Game Over / Win screens */
+        .game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            border-radius: 12px;
+            z-index: 3; /* Ensure overlays are on top of fireworks */
+        }
+        #winScreen, #midWinScreen {
+             background-color: rgba(0, 0, 0, 0.5); /* Lighter overlay for win screen */
+        }
+        .game-overlay h2 {
+            font-size: 48px;
+            margin: 0 0 10px 0;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            z-index: 4; /* Ensure text is on top */
+        }
+        .game-overlay p.subtitle {
+            font-size: 18px;
+            margin: 0;
+            padding: 0 20px;
+            color: #e2e8f0;
+        }
+        .game-overlay button {
+            margin-top: 20px;
+            padding: 12px 24px;
+            font-size: 18px;
+            color: #1a202c;
+            background-color: #e2e8f0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            z-index: 4; /* Ensure buttons are on top */
+        }
+        .game-overlay button:hover {
+            background-color: #cbd5e0;
+            transform: scale(1.05);
+        }
+        
+        /* Main Menu Specific Styles */
+        #mainMenu {
+            display: flex; /* Show by default */
+        }
+        #mainMenu .menu-buttons {
+            display: flex;
+            gap: 15px;
+        }
+        #levelCodeInput {
+            margin-top: 20px;
+            padding: 10px;
+            width: 120px;
+            text-align: center;
+            font-size: 18px;
+            border: 2px solid #4a5568;
+            border-radius: 8px;
+            background-color: #2d3748;
+            color: white;
+            text-transform: uppercase;
+        }
+        #codeSubmitBtn {
+            padding: 10px 20px;
+            margin-left: 10px;
+        }
+        #codeError {
+            margin-top: 10px;
+            color: #f56565;
+            height: 20px;
+            font-weight: bold;
+        }
+        
+        /* Controls & Codes Screen Specific Styles */
+        .info-screen p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 2px 0;
+        }
+        .info-screen p strong {
+            color: #90cdf4;
+            display: inline-block;
+            width: 70px;
+        }
+        .info-screen .code-section {
+            text-align: left;
+            margin-bottom: 15px;
+        }
+        .info-screen .code-section p strong {
+            width: 80px;
+        }
+        .info-screen .code-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 0 15px; /* Gap between columns */
+            text-align: left;
+        }
+        .info-screen .code-grid p {
+            font-size: 14px;
+        }
+        .info-screen .code-grid p strong {
+            width: 45px;
+        }
+
+        /* Container for touch controls on mobile */
+        .controls {
+            display: none; /* Hidden by default, shown on touch devices */
+            margin-top: 16px;
+            user-select: none; /* Prevent text selection on buttons */
+        }
+        /* Styling for control buttons */
+        .controls button {
+            width: 70px;
+            height: 70px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .controls button:active {
+            background-color: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
+        }
+        /* Media query to show controls on smaller screens */
+        @media (max-width: 768px), (pointer: coarse) {
+            .controls {
+                display: flex;
+                justify-content: space-between;
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <canvas id="fireworksCanvas"></canvas>
+        <div class="controls">
+            <button id="leftBtn">&larr;</button>
+            <button id="jumpBtn">&uarr;</button>
+            <button id="rightBtn">&rarr;</button>
+        </div>
+        <div id="mainMenu" class="game-overlay">
+            <h2>okJLUV Crashout Simulator</h2>
+            <div class="menu-buttons">
+                <button id="startBtn">Start Game</button>
+                <button id="controlsBtn">Controls</button>
+            </div>
+            <div>
+                <input type="text" id="levelCodeInput" placeholder="CODE" maxlength="4">
+                <button id="codeSubmitBtn">Go</button>
+            </div>
+            <p id="codeError"></p>
+        </div>
+        <div id="controlsScreen" class="game-overlay info-screen">
+            <h2>Controls</h2>
+            <div class="code-section">
+                <p><strong>Move:</strong> Arrow Keys / WASD</p>
+                <p><strong>Jump:</strong> Space / Up Arrow / W</p>
+                <p><strong>Pause:</strong> P Key</p>
+                <p><strong>Menu:</strong> Escape Key</p>
+            </div>
+            <button id="controlsBackBtn">Main Menu</button>
+        </div>
+        <div id="codesScreen" class="game-overlay info-screen">
+            <h2>Code List</h2>
+            <!-- Content is dynamically generated by JS -->
+            <button id="codesBackBtn">Main Menu</button>
+        </div>
+         <div id="jluvScreen" class="game-overlay">
+            <h2>lmao, i knew you would try this</h2>
+            <button id="jluvBackBtn">Main Menu</button>
+        </div>
+        <div id="pausedScreen" class="game-overlay">
+            <h2>Paused</h2>
+        </div>
+        <div id="deathScreen" class="game-overlay">
+            <h2>You Died</h2>
+            <button id="retryBtn">Retry</button>
+        </div>
+        <div id="gameOverScreen" class="game-overlay">
+            <h2>Game Over</h2>
+            <p class="subtitle">You were unable to stop okJLUV from crashing out</p>
+            <button id="restartBtn">Main Menu</button>
+        </div>
+        <div id="midWinScreen" class="game-overlay">
+            <h2>You Win!</h2>
+            <p class="subtitle">You prevented okJLUV from crashing out! Try typing 'POST' into the code box.</p>
+            <button id="midWinBtn">Main Menu</button>
+        </div>
+        <div id="winScreen" class="game-overlay">
+            <h2 id="winTitle">You Win!</h2>
+            <p id="winSubtitle" class="subtitle"></p>
+            <button id="nextLevelBtn">Next Level</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const fireworksCanvas = document.getElementById('fireworksCanvas');
+        const fireworksCtx = fireworksCanvas.getContext('2d');
+        const mainMenu = document.getElementById('mainMenu');
+        const startBtn = document.getElementById('startBtn');
+        const controlsBtn = document.getElementById('controlsBtn');
+        const controlsScreen = document.getElementById('controlsScreen');
+        const controlsBackBtn = document.getElementById('controlsBackBtn');
+        const codesScreen = document.getElementById('codesScreen');
+        const codesBackBtn = document.getElementById('codesBackBtn');
+        const jluvScreen = document.getElementById('jluvScreen');
+        const jluvBackBtn = document.getElementById('jluvBackBtn');
+        const pausedScreen = document.getElementById('pausedScreen');
+        const deathScreen = document.getElementById('deathScreen');
+        const retryBtn = document.getElementById('retryBtn');
+        const levelCodeInput = document.getElementById('levelCodeInput');
+        const codeSubmitBtn = document.getElementById('codeSubmitBtn');
+        const codeError = document.getElementById('codeError');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const winScreen = document.getElementById('winScreen');
+        const restartBtn = document.getElementById('restartBtn');
+        const nextLevelBtn = document.getElementById('nextLevelBtn');
+        const winTitle = document.getElementById('winTitle');
+        const winSubtitle = document.getElementById('winSubtitle');
+        const midWinScreen = document.getElementById('midWinScreen');
+        const midWinBtn = document.getElementById('midWinBtn');
+
+
+        canvas.width = 800;
+        canvas.height = 400;
+        fireworksCanvas.width = 800;
+        fireworksCanvas.height = 400;
+
+        // --- Game Constants ---
+        const GRAVITY = 0.4;
+        const PLAYER_SPEED = 5;
+        const JUMP_FORCE = 10;
+        const FRICTION = 0.8;
+
+        // --- Level Data ---
+        const levels = [
+            // Original 10 Levels
+            { platforms: [ { x: 0, y: 350, width: 400, height: 50 }, { x: 500, y: 280, width: 150, height: 20 }, { x: 750, y: 200, width: 150, height: 20 }, { x: 1000, y: 350, width: 200, height: 50 } ], goal: { x: 1100, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 200, height: 50 }, { x: 350, y: 280, width: 100, height: 20 }, { x: 550, y: 220, width: 100, height: 20 }, { x: 750, y: 160, width: 100, height: 20 }, { x: 1000, y: 350, width: 200, height: 50 } ], goal: { x: 1100, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 250, y: 350, width: 20, height: 20 }, { x: 400, y: 350, width: 20, height: 20 }, { x: 550, y: 350, width: 20, height: 20 }, { x: 700, y: 250, width: 150, height: 20 }, { x: 1000, y: 350, width: 200, height: 50 } ], goal: { x: 1100, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 200, y: 280, width: 150, height: 20 }, { x: 450, y: 280, width: 150, height: 20 }, { x: 700, y: 200, width: 150, height: 20 }, { x: 950, y: 150, width: 150, height: 20 }, { x: 1200, y: 350, width: 200, height: 50 } ], goal: { x: 1300, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 150, y: 300, width: 50, height: 20 }, { x: 250, y: 250, width: 50, height: 20 }, { x: 350, y: 200, width: 50, height: 20 }, { x: 250, y: 150, width: 50, height: 20 }, { x: 450, y: 150, width: 200, height: 20 }, { x: 750, y: 350, width: 200, height: 50 } ], goal: { x: 850, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 200, height: 50 }, { x: 300, y: 250, width: 100, height: 20 }, { x: 350, y: 150, width: 100, height: 20 }, { x: 600, y: 150, width: 100, height: 20 }, { x: 650, y: 250, width: 100, height: 20 }, { x: 900, y: 350, width: 200, height: 50 } ], goal: { x: 1000, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 200, height: 50 }, { x: 200, y: 250, width: 20, height: 120 }, { x: 350, y: 200, width: 150, height: 20 }, { x: 600, y: 200, width: 150, height: 20 }, { x: 850, y: 150, width: 100, height: 20 }, { x: 1100, y: 350, width: 200, height: 50 } ], goal: { x: 1200, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 150, y: 350, width: 50, height: 50 }, { x: 250, y: 350, width: 50, height: 50 }, { x: 350, y: 350, width: 50, height: 50 }, { x: 500, y: 250, width: 150, height: 20 }, { x: 750, y: 180, width: 150, height: 20 }, { x: 1000, y: 350, width: 200, height: 50 } ], goal: { x: 1100, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 200, y: 250, width: 100, height: 20 }, { x: 400, y: 150, width: 100, height: 20 }, { x: 600, y: 250, width: 100, height: 20 }, { x: 800, y: 150, width: 100, height: 20 }, { x: 1000, y: 250, width: 100, height: 20 }, { x: 1200, y: 350, width: 200, height: 50 } ], goal: { x: 1300, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 150, y: 300, width: 20, height: 20 }, { x: 250, y: 250, width: 20, height: 20 }, { x: 350, y: 200, width: 20, height: 20 }, { x: 450, y: 150, width: 20, height: 20 }, { x: 550, y: 200, width: 20, height: 20 }, { x: 650, y: 250, width: 20, height: 20 }, { x: 750, y: 300, width: 20, height: 20 }, { x: 900, y: 350, width: 400, height: 50 } ], goal: { x: 1200, y: 280 } },
+            // Expert Levels
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 300, y: 300, width: 50, height: 20 }, { x: 500, y: 250, width: 50, height: 20 }, { x: 700, y: 200, width: 50, height: 20 }, { x: 900, y: 250, width: 50, height: 20 }, { x: 1100, y: 300, width: 50, height: 20 }, { x: 1300, y: 250, width: 50, height: 20 }, { x: 1500, y: 200, width: 50, height: 20 }, { x: 1700, y: 350, width: 200, height: 50 } ], goal: { x: 1800, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 250, y: 300, width: 150, height: 20 }, { x: 250, y: 250, width: 20, height: 50 }, { x: 500, y: 250, width: 150, height: 20 }, { x: 750, y: 200, width: 150, height: 20 }, { x: 1000, y: 150, width: 150, height: 20 }, { x: 1250, y: 100, width: 150, height: 20 }, { x: 1500, y: 350, width: 300, height: 50 } ], goal: { x: 1700, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 150, y: 250, width: 20, height: 100 }, { x: 250, y: 250, width: 100, height: 20 }, { x: 450, y: 250, width: 20, height: 20 }, { x: 600, y: 200, width: 20, height: 20 }, { x: 750, y: 150, width: 20, height: 20 }, { x: 900, y: 200, width: 20, height: 20 }, { x: 1050, y: 250, width: 20, height: 20 }, { x: 1200, y: 300, width: 20, height: 20 }, { x: 1400, y: 250, width: 150, height: 20 }, { x: 1650, y: 350, width: 200, height: 50 } ], goal: { x: 1750, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 300, y: 280, width: 20, height: 90 }, { x: 450, y: 280, width: 100, height: 20 }, { x: 650, y: 220, width: 100, height: 20 }, { x: 850, y: 160, width: 100, height: 20 }, { x: 1050, y: 220, width: 100, height: 20 }, { x: 1250, y: 280, width: 100, height: 20 }, { x: 1450, y: 280, width: 20, height: 90 }, { x: 1600, y: 350, width: 200, height: 50 } ], goal: { x: 1700, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 250, y: 300, width: 20, height: 20 }, { x: 300, y: 250, width: 20, height: 20 }, { x: 350, y: 200, width: 20, height: 20 }, { x: 400, y: 150, width: 200, height: 20 }, { x: 700, y: 150, width: 200, height: 20 }, { x: 1000, y: 150, width: 200, height: 20 }, { x: 1300, y: 100, width: 20, height: 20 }, { x: 1300, y: 200, width: 20, height: 20 }, { x: 1300, y: 300, width: 20, height: 20 }, { x: 1500, y: 350, width: 200, height: 50 } ], goal: { x: 1600, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 250, y: 350, width: 50, height: 20 }, { x: 400, y: 300, width: 50, height: 20 }, { x: 550, y: 250, width: 50, height: 20 }, { x: 700, y: 200, width: 50, height: 20 }, { x: 850, y: 150, width: 50, height: 20 }, { x: 1000, y: 200, width: 50, height: 20 }, { x: 1150, y: 250, width: 50, height: 20 }, { x: 1300, y: 300, width: 50, height: 20 }, { x: 1450, y: 350, width: 50, height: 20 }, { x: 1650, y: 350, width: 200, height: 50 } ], goal: { x: 1750, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 150, y: 250, width: 20, height: 120 }, { x: 250, y: 200, width: 100, height: 20 }, { x: 400, y: 150, width: 100, height: 20 }, { x: 550, y: 100, width: 100, height: 20 }, { x: 700, y: 150, width: 100, height: 20 }, { x: 850, y: 200, width: 100, height: 20 }, { x: 1000, y: 250, width: 100, height: 20 }, { x: 1150, y: 200, width: 100, height: 20 }, { x: 1300, y: 150, width: 100, height: 20 }, { x: 1450, y: 100, width: 100, height: 20 }, { x: 1650, y: 350, width: 200, height: 50 } ], goal: { x: 1750, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 250, y: 350, width: 20, height: 20 }, { x: 350, y: 320, width: 20, height: 20 }, { x: 450, y: 290, width: 20, height: 20 }, { x: 550, y: 260, width: 20, height: 20 }, { x: 650, y: 230, width: 20, height: 20 }, { x: 750, y: 200, width: 20, height: 20 }, { x: 850, y: 230, width: 20, height: 20 }, { x: 950, y: 260, width: 20, height: 20 }, { x: 1050, y: 290, width: 20, height: 20 }, { x: 1150, y: 320, width: 20, height: 20 }, { x: 1250, y: 350, width: 20, height: 20 }, { x: 1400, y: 350, width: 400, height: 50 } ], goal: { x: 1700, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 200, y: 250, width: 20, height: 120 }, { x: 300, y: 150, width: 20, height: 120 }, { x: 400, y: 250, width: 20, height: 120 }, { x: 500, y: 150, width: 20, height: 120 }, { x: 600, y: 250, width: 20, height: 120 }, { x: 700, y: 150, width: 20, height: 120 }, { x: 800, y: 250, width: 20, height: 120 }, { x: 900, y: 150, width: 20, height: 120 }, { x: 1000, y: 250, width: 20, height: 120 }, { x: 1200, y: 350, width: 400, height: 50 } ], goal: { x: 1500, y: 280 } },
+            { platforms: [ { x: 0, y: 350, width: 150, height: 50 }, { x: 200, y: 350, width: 20, height: 20 }, { x: 300, y: 300, width: 20, height: 20 }, { x: 400, y: 250, width: 20, height: 20 }, { x: 500, y: 200, width: 20, height: 20 }, { x: 600, y: 150, width: 20, height: 20 }, { x: 700, y: 100, width: 20, height: 20 }, { x: 800, y: 150, width: 20, height: 20 }, { x: 900, y: 200, width: 20, height: 20 }, { x: 1000, y: 250, width: 20, height: 20 }, { x: 1100, y: 300, width: 20, height: 20 }, { x: 1200, y: 350, width: 20, height: 20 }, { x: 1400, y: 300, width: 20, height: 70 }, { x: 1600, y: 350, width: 200, height: 50 } ], goal: { x: 1700, y: 280 } }
+        ];
+        const levelCodes = { 
+            "RlJPRw==": 1, "Q0FLRQ==": 2, "RFVDSw==": 3, "R09BVA==": 4, "RklTSA==": 5, "TU9PTg==": 6, "QkVFUQ==": 7, "Wk9PTQ==": 8, "U1RBUg==": 9, 
+            "TEVBUA==": -1, "WlVMVA==": -2, "UE9TVA==": 10, "R09EUw==": -3, "SkxVVg==": -4, "Q09ERQ==": -5,
+            "R1JORA==": 10, "RkxUWA==": 11, "Q1JNUA==": 12, "U0tQTA==": 13, "VFJWUw==": 14, "V0xMSg==": 15, "WlBIUg==": 16, "UVZUTQ==": 17, "QkdMRA==": 18, "Rk5MSA==": 19
+        };
+        
+        // --- Game State ---
+        let lives, gameOver, gameWon, currentLevel, platforms = [], goal = {};
+        let isPaused = false;
+        let isDead = false;
+        let isLeapMode = false;
+        let isFinalWin = false;
+        let showLevelCode = false;
+        let animationFrameId;
+
+        // --- Player Object ---
+        const player = { x: 100, y: 200, width: 30, height: 50, velocityX: 0, velocityY: 0, isJumping: true };
+        const camera = { x: 0, y: 0 };
+        const keys = { right: false, left: false, up: false };
+
+        // --- Player Image ---
+        const playerImage = new Image();
+        let playerImageLoaded = false;
+        playerImage.onload = () => {
+            playerImageLoaded = true;
+        };
+        playerImage.onerror = () => {
+            console.error("Could not load jluvface.png. Using fallback.");
+        };
+        playerImage.src = 'jluvface.png';
+
+
+        // --- Fireworks ---
+        let fireworks = [];
+        const fireworkColors = ['#ff4f4f', '#ffb84f', '#ffff4f', '#4fff4f', '#4fb8ff', '#4f4fff', '#b84fff'];
+
+        // --- Input Handling ---
+        function handleKeyDown(e) { if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true; if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true; if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = true; }
+        function handleKeyUp(e) { if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false; if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false; if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = false; }
+
+        // --- Touch Controls ---
+        const leftBtn = document.getElementById('leftBtn'), rightBtn = document.getElementById('rightBtn'), jumpBtn = document.getElementById('jumpBtn');
+        leftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; }); leftBtn.addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
+        rightBtn.addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; }); rightBtn.addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
+        jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); keys.up = true; }); jumpBtn.addEventListener('touchend', (e) => { e.preventDefault(); keys.up = false; });
+
+        // --- Drawing Functions ---
+        function drawPlayer() {
+            const headSize = 25;
+            const bodyWidth = player.width;
+            const bodyHeight = player.height - headSize;
+            const bodyY = player.y + headSize;
+
+            ctx.save();
+            
+            // Body
+            ctx.fillStyle = '#d9534f'; 
+            ctx.fillRect(player.x, bodyY, bodyWidth, bodyHeight);
+
+            // Head
+            if (playerImageLoaded) {
+                ctx.drawImage(playerImage, player.x + (bodyWidth - headSize) / 2, player.y, headSize, headSize);
+            } else {
+                // Fallback to a circle if image fails to load
+                ctx.fillStyle = '#f0d9b5';
+                ctx.beginPath();
+                ctx.arc(player.x + bodyWidth / 2, player.y + headSize / 2, headSize / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        function drawPlatforms() { platforms.forEach(p => { ctx.fillStyle = p.height > 40 ? '#228B22' : '#A0522D'; ctx.fillRect(p.x, p.y, p.width, p.height); }); }
+        function drawGoal() { ctx.fillStyle = '#C0C0C0'; ctx.fillRect(goal.x, goal.y, 10, 70); ctx.fillStyle = '#32CD32'; ctx.beginPath(); ctx.moveTo(goal.x + 10, goal.y); ctx.lineTo(goal.x + 60, goal.y + 20); ctx.lineTo(goal.x + 10, goal.y + 40); ctx.closePath(); ctx.fill(); }
+        
+        function drawUI() {
+            ctx.font = '24px sans-serif';
+            if (isLeapMode) {
+                ctx.fillStyle = 'green';
+                ctx.fillText('💚', 10, 30);
+            } else {
+                ctx.fillStyle = 'red';
+                for (let i = 0; i < lives; i++) {
+                    ctx.fillText('❤', 10 + (i * 30), 30);
+                }
+            }
+            ctx.fillStyle = 'white';
+            ctx.font = '20px sans-serif';
+            ctx.textAlign = 'right';
+            
+            ctx.fillText(`Level: ${currentLevel + 1}`, canvas.width - 10, 30);
+            
+            if (showLevelCode) {
+                ctx.font = '16px sans-serif';
+                let codeText = 'Code: N/A';
+                if (isLeapMode) {
+                    codeText = currentLevel < 10 ? 'Code: LEAP' : 'Code: ZULT';
+                } else if (currentLevel > 0) {
+                    const foundCode = Object.keys(levelCodes).find(key => 
+                        levelCodes[key] === currentLevel && ["TEVBUA==", "WlVMVA==", "UE9TVA==", "R09EUw==", "SkxVVg==", "Q09ERQ=="].indexOf(key) === -1
+                    );
+                    if (foundCode) {
+                        codeText = `Code: ${atob(foundCode)}`;
+                    }
+                }
+                ctx.fillText(codeText, canvas.width - 10, 55);
+            }
+            ctx.textAlign = 'left';
+        }
+
+        // --- Game Logic Functions ---
+        function resetPlayer() { player.x = 100; player.y = 200; player.velocityX = 0; player.velocityY = 0; player.isJumping = true; }
+        
+        function showMainMenu() {
+            mainMenu.style.display = 'flex';
+            gameOverScreen.style.display = 'none';
+            winScreen.style.display = 'none';
+            controlsScreen.style.display = 'none';
+            codesScreen.style.display = 'none';
+            jluvScreen.style.display = 'none';
+            pausedScreen.style.display = 'none';
+            deathScreen.style.display = 'none';
+            midWinScreen.style.display = 'none';
+            isPaused = false;
+            isDead = false;
+            isFinalWin = false;
+            fireworksCtx.clearRect(0, 0, fireworksCanvas.width, fireworksCanvas.height);
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+
+        function startGame(levelIndex) {
+            mainMenu.style.display = 'none';
+            
+            if (levelIndex === -1) { // LEAP mode
+                isLeapMode = true;
+                currentLevel = 0;
+            } else if (levelIndex === -2) { // ZULT mode
+                isLeapMode = true;
+                currentLevel = 10;
+            } else if (levelIndex === -3) { // GODS mode
+                mainMenu.style.display = 'none';
+                codesScreen.style.display = 'flex';
+                return;
+            } else if (levelIndex === -4) { // JLUV mode
+                mainMenu.style.display = 'none';
+                jluvScreen.style.display = 'flex';
+                return;
+            } else if (levelIndex === -5) { // CODE toggle
+                showLevelCode = !showLevelCode;
+                levelCodeInput.value = '';
+                codeError.textContent = `Code display ${showLevelCode ? 'ON' : 'OFF'}`;
+                mainMenu.style.display = 'flex';
+                return;
+            } else { // Normal mode
+                isLeapMode = false;
+                lives = 3;
+                currentLevel = levelIndex;
+            }
+
+            gameOver = false;
+            isPaused = false;
+            isDead = false;
+            loadLevel(currentLevel);
+        }
+
+        function loadLevel(levelIndex) {
+            const levelData = levels[levelIndex];
+            platforms = levelData.platforms.map(p => ({...p}));
+            goal = {...levelData.goal};
+            gameWon = false;
+            winScreen.style.display = 'none';
+            resetPlayer();
+            if (!animationFrameId) {
+                 gameLoop();
+            }
+        }
+
+        function goToNextLevel() { currentLevel++; loadLevel(currentLevel); }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            pausedScreen.style.display = isPaused ? 'flex' : 'none';
+        }
+
+        // --- Firework Logic ---
+        function createFirework() {
+            const x = Math.random() * fireworksCanvas.width;
+            const color = fireworkColors[Math.floor(Math.random() * fireworkColors.length)];
+            fireworks.push({ x, y: fireworksCanvas.height, vx: 0, vy: -(Math.random() * 4 + 8), size: 3, isRocket: true, color });
+        }
+
+        function explode(x, y, color) {
+            const particleCount = 50 + Math.random() * 50;
+            for (let i = 0; i < particleCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 1;
+                fireworks.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: 2,
+                    isRocket: false,
+                    color,
+                    alpha: 1
+                });
+            }
+        }
+
+        function updateAndDrawFireworks() {
+            fireworksCtx.clearRect(0, 0, fireworksCanvas.width, fireworksCanvas.height);
+
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                const p = fireworks[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                
+                if (p.isRocket) {
+                    p.vy += 0.05;
+                    if (p.vy >= 0) {
+                        explode(p.x, p.y, p.color);
+                        fireworks.splice(i, 1);
+                        continue;
+                    }
+                } else {
+                    p.vy += 0.1;
+                    p.alpha -= 0.02;
+                    if (p.alpha <= 0) {
+                        fireworks.splice(i, 1);
+                        continue;
+                    }
+                }
+                
+                fireworksCtx.globalAlpha = p.alpha;
+                fireworksCtx.fillStyle = p.color;
+                fireworksCtx.fillRect(p.x, p.y, p.size, p.size);
+                fireworksCtx.globalAlpha = 1;
+            }
+        }
+
+        // --- Robust Collision Handling ---
+        function handleCollisions() {
+            player.x += player.velocityX;
+            platforms.forEach(platform => {
+                if (player.x < platform.x + platform.width && player.x + player.width > platform.x && player.y < platform.y + platform.height && player.y + player.height > platform.y) {
+                    if (player.velocityX > 0) player.x = platform.x - player.width;
+                    else if (player.velocityX < 0) player.x = platform.x + platform.width;
+                    player.velocityX = 0;
+                }
+            });
+
+            player.y += player.velocityY;
+            player.isJumping = true;
+            platforms.forEach(platform => {
+                if (player.x < platform.x + platform.width && player.x + player.width > platform.x && player.y < platform.y + platform.height && player.y + player.height > platform.y) {
+                    if (player.velocityY > 0) {
+                        player.y = platform.y - player.height;
+                        player.velocityY = 0;
+                        player.isJumping = false;
+                    } else if (player.velocityY < 0) {
+                        player.y = platform.y + platform.height;
+                        player.velocityY = 0;
+                    }
+                }
+            });
+        }
+
+        // --- Game Loop ---
+        function gameLoop() {
+            if (!gameOver && !gameWon && !isPaused && !isDead) {
+                // Update Logic
+                if (keys.right) player.velocityX = PLAYER_SPEED; 
+                if (keys.left) player.velocityX = -PLAYER_SPEED;
+                if (keys.up && !player.isJumping) { player.velocityY = -JUMP_FORCE; player.isJumping = true; }
+                player.velocityX *= FRICTION;
+                player.velocityY += GRAVITY;
+                handleCollisions();
+
+                // Game State Conditions
+                if (player.y > canvas.height + 200) {
+                    if (isLeapMode) {
+                        resetPlayer();
+                    } else {
+                        lives--;
+                        if (lives <= 0) {
+                            gameOver = true;
+                            gameOverScreen.style.display = 'flex';
+                        } else {
+                            isDead = true;
+                            deathScreen.style.display = 'flex';
+                        }
+                    }
+                }
+                if (player.x + player.width >= goal.x) {
+                    gameWon = true;
+                    if (currentLevel === 9) {
+                        midWinScreen.style.display = 'flex';
+                    } else if (currentLevel < levels.length - 1) {
+                        winTitle.textContent = `Level ${currentLevel + 1} Complete!`;
+                        winSubtitle.textContent = '';
+                        nextLevelBtn.textContent = 'Next Level';
+                        winScreen.style.display = 'flex';
+                    } else {
+                        isFinalWin = true;
+                        fireworks = [];
+                        winTitle.textContent = 'You Win!';
+                        winSubtitle.textContent = "You are a god amongst men. Try typing 'GODS' into the code box.";
+                        nextLevelBtn.textContent = 'Play Again';
+                        winScreen.style.display = 'flex';
+                    }
+                }
+            }
+
+            // Camera Logic
+            camera.x = player.x - canvas.width / 2 + 100; if (camera.x < 0) camera.x = 0;
+            const worldWidth = Math.max(...platforms.map(p => p.x + p.width), goal.x + 100);
+            if (camera.x > worldWidth - canvas.width) camera.x = worldWidth - canvas.width;
+
+            // Drawing
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+            drawPlatforms();
+            drawPlayer();
+            drawGoal();
+            ctx.restore();
+            drawUI();
+
+            if (isFinalWin) {
+                if (Math.random() < 0.04) createFirework();
+                updateAndDrawFireworks();
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('keydown', handleKeyDown); 
+        window.addEventListener('keyup', handleKeyUp);
+        
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Enter') {
+                if (deathScreen.style.display === 'flex') { e.preventDefault(); retryBtn.click(); }
+                else if (gameOverScreen.style.display === 'flex') { e.preventDefault(); showMainMenu(); }
+                else if (winScreen.style.display === 'flex') { e.preventDefault(); nextLevelBtn.click(); }
+                else if (midWinScreen.style.display === 'flex') { e.preventDefault(); showMainMenu(); }
+                else if (mainMenu.style.display === 'flex') { e.preventDefault(); codeSubmitBtn.click(); }
+                else if (codesScreen.style.display === 'flex') { e.preventDefault(); showMainMenu(); }
+                else if (jluvScreen.style.display === 'flex') { e.preventDefault(); showMainMenu(); }
+            }
+            if (e.code === 'Escape') { e.preventDefault(); showMainMenu(); }
+            const gameIsRunning = mainMenu.style.display === 'none' && !gameOver && !gameWon && !isDead;
+            if (gameIsRunning && e.code === 'KeyP') { e.preventDefault(); togglePause(); }
+        });
+
+        startBtn.addEventListener('click', () => startGame(0));
+        controlsBtn.addEventListener('click', () => { mainMenu.style.display = 'none'; controlsScreen.style.display = 'flex'; });
+        controlsBackBtn.addEventListener('click', showMainMenu);
+        codesBackBtn.addEventListener('click', showMainMenu);
+        jluvBackBtn.addEventListener('click', showMainMenu);
+        midWinBtn.addEventListener('click', showMainMenu);
+        
+        codeSubmitBtn.addEventListener('click', () => {
+            const code = levelCodeInput.value.toUpperCase();
+            try {
+                const encodedCode = btoa(code);
+                if (levelCodes.hasOwnProperty(encodedCode)) {
+                    startGame(levelCodes[encodedCode]);
+                } else {
+                    codeError.textContent = 'Invalid Code';
+                }
+            } catch (e) {
+                codeError.textContent = 'Invalid Code';
+            }
+        });
+
+        retryBtn.addEventListener('click', () => {
+            isDead = false;
+            deathScreen.style.display = 'none';
+            resetPlayer();
+        });
+        restartBtn.addEventListener('click', showMainMenu);
+        nextLevelBtn.addEventListener('click', () => {
+            if (currentLevel < levels.length - 1) {
+                goToNextLevel();
+            } else {
+                showMainMenu();
+            }
+        });
+        
+        // --- Dynamic Content Population ---
+        function populateCodesScreen() {
+            const contentContainer = document.createElement('div');
+
+            const specialSection = document.createElement('div');
+            specialSection.className = 'code-section';
+            specialSection.innerHTML = `<p><strong>LEAP:</strong> Infinite lives (Levels 1-10)</p><p><strong>ZULT:</strong> Infinite lives (Levels 11-20)</p>`;
+            contentContainer.appendChild(specialSection);
+
+            const grid = document.createElement('div');
+            grid.className = 'code-grid';
+
+            const levelCodeEntries = Object.entries(levelCodes)
+                .map(([encoded, level]) => ({ code: atob(encoded), level: level }))
+                .filter(item => item.level >= 1)
+                .sort((a, b) => a.level - b.level);
+            
+            levelCodeEntries.forEach(item => {
+                const p = document.createElement('p');
+                p.innerHTML = `<strong>${item.code}:</strong> L${item.level + 1}`;
+                grid.appendChild(p);
+            });
+            contentContainer.appendChild(grid);
+
+            codesScreen.insertBefore(contentContainer, codesBackBtn);
+        }
+        
+        // --- Start the Game ---
+        populateCodesScreen();
+        showMainMenu();
+    </script>
+</body>
+</html>
